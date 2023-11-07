@@ -20,6 +20,8 @@ using namespace c74::min;
 class syrinx : public object<syrinx>, public sample_operator<0, 1> {
 private:
     //lib::sync m_oscillator;    // note: must be created prior to any attributes that might set parameters below
+    mutex    m_mutex;
+
     
 protected:
     SyrinxMembraneGenerator m_syrinx;
@@ -54,11 +56,14 @@ public:
         }
     };
 
-    message<> m_number { this, "number", "Set the tension in N/cm^3.",
+    message<threadsafe::yes> m_number { this, "number", "Set the tension in N/cm^3.",
         MIN_FUNCTION {
 //            sampleRate = samplerate(); //this isn't set in dspinfo??
 //            cout << "sampleRate: " << sampleRate << endl;
 //            m_syrinx.setSampleRate(sampleRate);
+            
+            lock lock { m_mutex };
+
 
             switch(inlet)
             {
@@ -74,6 +79,8 @@ public:
                 default:
                     assert(false);
             }
+            lock.unlock();
+
             return {};
         }
     };
@@ -93,25 +100,37 @@ public:
     attribute<number> tension { this, "tension", 1.0,
         description {"Tension in N/cm^3"},
         setter { MIN_FUNCTION {
+            
+            lock lock { m_mutex };
+
             m_syrinx.setTension(args[0]);
+            
+            lock.unlock();
+            
             return args;
         }}
     };
 
     sample operator()() {
+        lock lock { m_mutex };
+
         sample out = m_syrinx();
-//        if(count % 44100/4410 != 0){
+        
+        lock.unlock();
+        
+        if(count % 44100/4410 != 0){
 //        if( out != 0  ){
-//            cout << "sample: " << out << endl;
-//            count = 1;
+            cout << "sample: " << out << endl;
+            count = 1;
 //            cout << m_syrinx.getPhysConstants() << "  ,  " <<
 //            m_syrinx.getPreshDiff() << "  ,  " <<
 //            m_syrinx.getZG() << "  ,  " <<
 //            m_syrinx.getPG() << "  ,  " <<
 //            m_syrinx.getDPO() <<endl;
+            
         
-//        }
-//        count++;
+        }
+        count++;
         return out;
     }
 };

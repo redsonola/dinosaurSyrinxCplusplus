@@ -13,6 +13,7 @@
 #include "WallLossFilter.h"
 #include "HPOut.h"
 #include "ScatteringJunction.h"
+#include "DelayLine.h"
 
 #include <limits>
 
@@ -384,12 +385,12 @@ public:
         double pOut =  membrane.tick( lastSample ); //the syrinx membrane
 
         //********1st delayLine => tracheaFilter => flip => last sample  *********
-        double curOut =  delayLineGenerate( pOut + lastSample, bronch1Delay1 );
+        double curOut =  delayLineGenerate( pOut + lastSample, tracheaDelay1 );
         lastSample =  tracheaFilter.tick( curOut ); //low-pass filter
         lastSample =  lastSample * -1; //flip
         
         //********2nd delayLine, going back *********
-        lastSample =  delayLineGenerate( lastSample, bronch1Delay2 );
+        lastSample =  delayLineGenerate( lastSample, tracheaDelay2 );
         lastSample =  wallLoss.tick( lastSample );
         
         //******** Add delay lines ==> High Pass Filter => out  *********
@@ -398,12 +399,6 @@ public:
         
         //****** simple scaling into more audio-like values, sigh  *********
         fout = fout / max;
-        
-//        if(fout > 1.0 || fout < -1) //normalize a bit
-//        {
-//            max = fout;
-//            fout = fout / max;
-//        }
         
         if( isnan( fout ) )
         {
@@ -490,15 +485,15 @@ public:
             initFunc();
         }
         
-        if( fout <= std::numeric_limits<float>::min() )
-        {
-            fout = 0;
-        }
-        else if (fout > 1.0)
-        {
-            max = fout;
-            fout = fout / max;
-        }
+//        if( fout <= std::numeric_limits<float>::min() )
+//        {
+//            fout = 0;
+//        }
+//        else if (fout > 1.0)
+//        {
+//            max = fout;
+//            fout = fout / max;
+//        }
         return fout;
     }
 };

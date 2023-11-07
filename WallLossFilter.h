@@ -17,7 +17,7 @@ protected:
     double w  = wFromFreq(freq);
     //150.0*2.0*pi => float w;
     
-    double a = 0.35; //  1/2 diameter of trachea, in m - NOTE this is from SyrinxMembrane --
+    double a = 4.5; //  1/2 diameter of trachea, in m - NOTE this is from SyrinxMembrane --
                      //TODO:  to factor out the constants that are used across scopes: a, L, c, etc
     double propogationAttenuationCoeff = calcPropogationAttenuationCoeff(); //theta in Fletcher1988 p466
     double wallLossCoeff = calcWallLossCoeff(); //beta in Fletcher
