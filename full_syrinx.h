@@ -50,7 +50,7 @@ protected:
     double rightTension; //only used with independent membranes
 
     //syrinx membranes
-    double membraneCount = 2;
+    double membraneCount = 1;
     SyrinxMembrane membrane;
     SyrinxMembrane membrane2;
     
@@ -72,7 +72,9 @@ protected:
     double delayTimeBronchi = 0; //delay of each of the bronchi sides
     double delayTime = 0; //the trachea delay time
     
-    double sampleRate = 44100;
+    int SR =44100;
+    double sampleRate = SR;
+    
     
     double L = 116; //trachea length
     
@@ -80,14 +82,14 @@ protected:
     //int channelCount = options.channelCount;
     
     //one for each way   -- //delay(std::pair<size_t, number> capacity_and_size)
-    lib::delay bronch1Delay1{};
-    lib::delay bronch1Delay2{};
+    DelayLine bronch1Delay1 = DelayLine(sampleRate);
+    DelayLine bronch1Delay2 = DelayLine(sampleRate);
     
-    lib::delay bronch2Delay1{};
-    lib::delay bronch2Delay2{};
+    DelayLine bronch2Delay1 = DelayLine(sampleRate);
+    DelayLine bronch2Delay2 = DelayLine(sampleRate);
     
-    lib::delay tracheaDelay1{};
-    lib::delay tracheaDelay2{};
+    DelayLine tracheaDelay1 = DelayLine(sampleRate);
+    DelayLine tracheaDelay2 = DelayLine(sampleRate);
     
     //generate function
     GenerateFunctionType<SyrinxMembraneGenerator> genFunction;
@@ -161,21 +163,7 @@ protected:
         tracheaDelay2.clear();
         
     }
-    
-    void createDelays()
-    {
-        clearDelays();
-        
-        //one for each way
-        bronch1Delay1.size( delayTimeBronchi );
-        bronch1Delay2.size( delayTimeBronchi );
 
-        bronch2Delay1.size( delayTimeBronchi );
-        bronch2Delay2.size( delayTimeBronchi );
-
-        tracheaDelay1.size( delayTime );
-        tracheaDelay2.size( delayTime );
-    }
     
     void initFunc()
     {
@@ -185,18 +173,19 @@ protected:
         lastTracheaSample = 0;
         
         //the delay of comb filter for the waveguide
+        //the delay of comb filter for the waveguide
         //which syrinx
         //            if( membraneCount >= 2)
         //                generateFunction =  generateTracheobronchial;
         //            else
         //                generateFunction =  generateTrachealSyrinx;
         //            setDelayTime(  getDelayPeriod(L) );
-        
+                
         //hadrosaur values for now
         hadrosaurInit();
-        
+    
         //one for each way
-        createDelays();
+        setDelayTime(L);
         
         //set new refelection values
         bronch1Filter.setCT( c, membrane.get_T() );
@@ -222,13 +211,7 @@ protected:
     }
     
 public:
-    explicit SyrinxMembraneGenerator(double sampleRate_ = 44100) :
-    bronch1Delay1(std::pair<size_t, number>(getBronchiDelay()*2, getBronchiDelay())),
-    bronch1Delay2(std::pair<size_t, number>(getBronchiDelay()*2, getBronchiDelay())),
-    bronch2Delay1(std::pair<size_t, number>(getBronchiDelay()*2, getBronchiDelay())),
-    bronch2Delay2(std::pair<size_t, number>(getBronchiDelay()*2, getBronchiDelay())),
-    tracheaDelay1(std::pair<size_t, number>(getTracheaDelay()*2, getTracheaDelay())),
-    tracheaDelay2(std::pair<size_t, number>(getTracheaDelay()*2, getTracheaDelay()))
+    explicit SyrinxMembraneGenerator(double sampleRate_ = 44100)
     {
         sampleRate = sampleRate_;
         
@@ -282,12 +265,40 @@ public:
         return membrane.getPG();
     }
     
+    //reset everything
+    void reset()
+    {
+        lastSample = 0;
+        lastSample2 = 0;
+        lastTracheaSample = 0;
+
+        hpOut.reset();
+        bronch1Filter.reset();
+        tracheaFilter.reset();
+        bronch2Filter.reset();
+        
+        clearDelays();
+    }
+    
+//    protected getPeriod()
+//    {
+//        let LFreq =  this.membrane.c/(2.0*this.membrane.L); //- the resonant freq. of the tube
+//        let period =  ( (0.5 * this.membrane.SRATE) / (LFreq) - 1); //in samples
+//        period = period / this.membrane.SRATE; //convert back to seconds
+//        return period;
+//    }
+    
     double getDelayPeriod(double tubeLength)
     {
         double c = membrane.getSoundSpeed();
         double LFreq = c/(2.0*tubeLength); //- the resonant freq. of the tube
         double period =  ( (0.5 * sampleRate) / (LFreq) - 1); //in samples
         return period;
+    }
+    
+    double getDelayPeriod()
+    {
+        return getDelayPeriod(membrane.get_L());
     }
     
     //set delay time
@@ -379,18 +390,18 @@ public:
         //p1 => delay;
         //************
         
-        membrane.changeTension(tension);
-        membrane.changePG(pG);
+//        membrane.changeTension(tension);
+//        membrane.changePG(pG);
 
         double pOut =  membrane.tick( lastSample ); //the syrinx membrane
-
+        
         //********1st delayLine => tracheaFilter => flip => last sample  *********
-        double curOut =  delayLineGenerate( pOut + lastSample, tracheaDelay1 );
+        double curOut =  delayLineGenerate( pOut + lastSample, tracheaDelay1, delayTime );
         lastSample =  tracheaFilter.tick( curOut ); //low-pass filter
         lastSample =  lastSample * -1; //flip
         
         //********2nd delayLine, going back *********
-        lastSample =  delayLineGenerate( lastSample, tracheaDelay2 );
+        lastSample =  delayLineGenerate( lastSample, tracheaDelay2, delayTime );
         lastSample =  wallLoss.tick( lastSample );
         
         //******** Add delay lines ==> High Pass Filter => out  *********
@@ -413,9 +424,15 @@ public:
     //this is the delayLine generate -- this did not really have to be a separate method --
     //this is leftover from javascript implementation where more had to be done.
     //note: could use operator()
-    sample delayLineGenerate( double input, lib::delay &delayLine )
+    sample delayLineGenerate( double input, DelayLine &delayLine, double delayTime )
     {
-        auto delayedSample = delayLine(input);
+//        auto delayedSample = delayLine(input);
+//        return delayedSample;
+        
+        assert(delayTime < sampleRate);
+        
+        sample delayedSample = delayLine.get(0, delayTime);
+        delayLine.push(0, input);
         return delayedSample;
     }
     
@@ -445,12 +462,12 @@ public:
     
         //******** Sound is generated and travels up each bronchi *********
         double pOut =  membrane.tick( lastSample); //the syrinx membrane  //Math.random() * 2 - 1;
-        double curOut =  delayLineGenerate(pOut+lastSample,  bronch1Delay1);
+        double curOut =  delayLineGenerate(pOut+lastSample,  bronch1Delay1, delayTimeBronchi);
         lastSample =  bronch1Filter.tick(curOut); //low-pass filter
         lastSample =  lastSample * -1; //flip
     
         double pOut2 =  membrane2.tick( lastSample2); //the syrinx membrane  //Math.random() * 2 - 1;
-        double curOut2 =  delayLineGenerate(pOut2+lastSample2, bronch2Delay1);
+        double curOut2 =  delayLineGenerate(pOut2+lastSample2, bronch2Delay1, delayTimeBronchi);
         lastSample2 =  bronch2Filter.tick(curOut2); //low-pass filter
         lastSample2 =  lastSample2 * -1; //flip
     
@@ -458,18 +475,18 @@ public:
         PostScatteringPressures scatterOut =  scatteringJunction.scatter(curOut, curOut2,  lastTracheaSample);
     
         //******** Sound travels through trachea *********
-        double trachOut =  delayLineGenerate(scatterOut.trach+lastTracheaSample,  tracheaDelay1);
+        double trachOut =  delayLineGenerate(scatterOut.trach+lastTracheaSample,  tracheaDelay1, delayTimeBronchi);
         lastTracheaSample =  tracheaFilter.tick(trachOut); //low-pass filter
         lastTracheaSample =  lastTracheaSample * -1; //flip
     
         //******** Sound is reflected from bronchi & trachea *********
-        lastSample =  delayLineGenerate(scatterOut.b1, bronch1Delay2);
+        lastSample =  delayLineGenerate(scatterOut.b1, bronch1Delay2, delayTimeBronchi);
         lastSample =  wallLoss.tick( lastSample);
     
-        lastSample2 =  delayLineGenerate(scatterOut.b2,bronch2Delay2);
+        lastSample2 =  delayLineGenerate(scatterOut.b2,bronch2Delay2, delayTimeBronchi);
         lastSample2 =  wallLoss.tick( lastSample2);
     
-        lastTracheaSample =  delayLineGenerate( lastTracheaSample, tracheaDelay2);
+        lastTracheaSample =  delayLineGenerate( lastTracheaSample, tracheaDelay2, delayTimeBronchi);
         //lastTracheaSample =  wallLoss.tick( lastTracheaSample);
     
         //******** Add delay lines ==> High Pass Filter => out  *********

@@ -411,8 +411,7 @@ double getP0()
          //so, try this?
          dT = (dT + diff)*T*modT;
          curT = curT + dT ;
-
-     
+         
          wFreq[0] = sqrt( (5*curT) / (pM*a*h*d) ) ; //Smyth diss.
          // w[0]*1.6 => w[1]; //Fletcher1988
          wFreq[1] = wFreq[0]*1.6; //this is essentially the same thing, but nevertheless, as this is how I discovered frequencies that

@@ -46,6 +46,12 @@ public:
         lastV = 0;
     }
     
+    void reset()
+    {
+        lastOut = 0;
+        lastV = 0;
+    }
+    
     void setCT(double c_, double T_)
     {
         c = c_;

@@ -44,6 +44,7 @@ public:
     
     inlet<>  in1 {this, "(number) air sac pressure (pG)"};
     inlet<>  in2 {this, "(number) tension (N/cm^3)"};
+    inlet<> in3  {this, "(number) panic - send 1 to clear delays and last sample"};
 
     outlet<> out1 {this, "(signal) syrinx output pressure (sound)", "signal"};
 
@@ -74,6 +75,10 @@ public:
                     break;
                 case 1:
                     m_syrinx.setTension(args[0]);
+                    //cout << "tension: " << m_syrinx.getTension() << endl;
+                    break;
+                case 2:
+                    m_syrinx.reset();
                     //cout << "tension: " << m_syrinx.getTension() << endl;
                     break;
                 default:
@@ -115,12 +120,13 @@ public:
         lock lock { m_mutex };
 
         sample out = m_syrinx();
+//        double period = m_syrinx.getDelayPeriod();
         
         lock.unlock();
         
         if(count % 44100/4410 != 0){
 //        if( out != 0  ){
-            cout << "sample: " << out << endl;
+//            cout << "pG: " << m_syrinx.getPG() << endl;
             count = 1;
 //            cout << m_syrinx.getPhysConstants() << "  ,  " <<
 //            m_syrinx.getPreshDiff() << "  ,  " <<

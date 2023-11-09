@@ -33,6 +33,12 @@ public:
         b0 = b0_;
     }
     
+    void reset()
+    {
+        lastOut = 0;
+        lastV = 0;
+    }
+    
     double tick( double input )
     {
         if(  isnan(lastOut) )
